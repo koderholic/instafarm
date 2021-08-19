@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-pragma abicoder v2;
-
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./ISTToken.sol";
 
 
 contract InstaFarm is Ownable {
@@ -17,12 +16,12 @@ contract InstaFarm is Ownable {
 
     // Start block
     uint256 startBlock;
-    ISTToken public istToken;
-    address public rewardTreasury;
+    ISTToken public platformToken;
+    address public rewardVault;
 
-    //    Total token distribution across pools per block
+    // Total token to be distributed across pools per block
     uint256 public totalDistRewardPerBlock;
-    // Total pools in contract
+    // Total rewardFactor across pools
     uint256 public totalRewardFactorPerBlock = 0;
 
     enum PoolType { LP, Token}
@@ -32,16 +31,16 @@ contract InstaFarm is Ownable {
     struct Farmer {
         uint256 amount;     // How many LP tokens or just tokens the user has provided.
         uint256 rewardDue; // Reward yet to be claimed by user
-        uint256 rewardEarned; // Total reward earned by user so far in pool
+        uint256 rewardEarned; // Total reward earned by user so far in a pool
     }
 
     // Info of each pool.
     struct PoolInfo {
         IERC20 lpToken;           // Address of LP token contract.
-        uint256 rewardFactor;       // How many allocation points assigned to this pool. CAKEs to distribute per block.
+        uint256 rewardFactor;       // How many allocation points assigned to this pool. ISTs to distribute per block.
         uint256 poolRewardPerUnitStake;
         uint256 totalRewardEarned;
-        uint256 lastRewardBlock;  // Last block number that CAKEs distribution occurs.
+        uint256 lastRewardBlock;  // Last block number that IST distribution occurs.
         PoolType poolType;
     }
 
@@ -62,9 +61,9 @@ contract InstaFarm is Ownable {
 
     constructor (uint256 _rewardPerBlock, address _rewardTreasury, address _istToken ) {
         startBlock  = block.number;
-        istToken = ISTToken(_istToken);
+        platformToken = ISTToken(_istToken);
         totalDistRewardPerBlock = _rewardPerBlock;
-        rewardTreasury = _rewardTreasury;
+        rewardVault = _rewardTreasury;
     }
 
     // Create new poolID
@@ -94,7 +93,7 @@ contract InstaFarm is Ownable {
     // Update pool
     // Only onwner can update a pool
     // Ensure pool exist
-    // Only pool's rewardFactorcan be updated
+    // Only pool's rewardFactor can be updated
     function updatePool(uint256 _PID, uint256 _poolRewardFactor) public onlyOwner {
         _PID = _PID.sub(1);
         PoolInfo storage pool = allPools[_PID];
@@ -113,7 +112,7 @@ contract InstaFarm is Ownable {
     // Ensure pool exist
     // If it's the first time user is depositing, create farmer account , else update it
     // When user deposit to pool, update pool and user details
-    function Deposit(uint256 _PID, uint256 _amount) public {
+    function deposit(uint256 _PID, uint256 _amount) public {
         if (_amount <= 0) {
             return;
         }
@@ -128,8 +127,8 @@ contract InstaFarm is Ownable {
 
         //increase user and pool staking
         farmer.amount = farmer.amount.add(_amount);
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
 
         // Emit pool Deposit
         emit PoolDeposit(_PID, msg.sender, _amount, farmer.amount);
@@ -150,14 +149,14 @@ contract InstaFarm is Ownable {
         uint256 poolRewardPerUnitStake = poolRewardForDist.div(totalStakedInPool);
 
         pool.lastRewardBlock = block.number;
-        pool.poolRewardPerUnitStake = pool.poolRewardPerUnitStake.add(poolRewardPerUnitStake);
+        pool.poolRewardPerUnitStake = pool.poolRewardPerUnitStake.add(poolRewardPerUnitStake.mul(1e12));
         pool.totalRewardEarned = pool.totalRewardEarned.add(poolRewardForDist);
     }
 
 
     // Withdraw from pool
     // Ensure farmer has balance above withdrawal amount
-    function Withdraw(uint256 _PID, uint256 _amount) public {
+    function withdraw(uint256 _PID, uint256 _amount) public {
         if (_amount <= 0) {
             return;
         }
@@ -173,15 +172,15 @@ contract InstaFarm is Ownable {
 
         // Calculate pool and user reward up until current block; inclusing user pending reward or rewarddue
         __computePoolReward(_PID);
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
 
         // reduce user and pool staking
         farmer.amount = farmer.amount.sub(_amount);
         pool.lpToken.safeTransfer(msg.sender, _amount);
 
         if (farmer.amount <= 0 ) {
-            istToken.transferFrom(rewardTreasury, msg.sender, farmer.rewardDue);
+            platformToken.transferFrom(rewardVault, msg.sender, farmer.rewardDue);
             farmer.rewardDue = 0;
             farmer.rewardEarned = 0;
         }
@@ -202,10 +201,10 @@ contract InstaFarm is Ownable {
         __computePoolReward(_PID);
 
         //reduce user and pool staking
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
 
-        istToken.transferFrom(address(rewardTreasury), msg.sender, farmer.rewardDue);
+        platformToken.transferFrom(address(rewardVault), msg.sender, farmer.rewardDue);
         farmer.rewardDue = 0;
 
         // Emit claim reward
@@ -225,9 +224,19 @@ contract InstaFarm is Ownable {
     }
 
 
-    function getFarmerInfoPerPoolID(uint256 _PID, address _farmer) public view returns(Farmer memory) {
+    function getFarmerInfoPerPoolID(uint256 _PID, address _farmer) public returns(Farmer memory) {
         _PID = _PID.sub(1);
-        return poolToFarmers[_PID][_farmer];
+
+        PoolInfo storage pool = allPools[_PID];
+
+        __computePoolReward(_PID);
+        Farmer storage farmerInfo = poolToFarmers[_PID][_farmer];
+
+        //increase user and pool staking
+        farmerInfo.rewardEarned = farmerInfo.rewardEarned.add(farmerInfo.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmerInfo.rewardDue = farmerInfo.rewardDue.add(farmerInfo.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+
+        return farmerInfo;
     }
 
 
