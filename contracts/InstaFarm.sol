@@ -8,14 +8,13 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./ISTToken.sol";
 
-
 contract InstaFarm is Ownable {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     // Start block
-    uint256 startBlock;
+    uint256 public startBlock;
     ISTToken public platformToken;
     address public rewardVault;
 
@@ -224,19 +223,9 @@ contract InstaFarm is Ownable {
     }
 
 
-    function getFarmerInfoPerPoolID(uint256 _PID, address _farmer) public returns(Farmer memory) {
+    function getFarmerInfoPerPoolID(uint256 _PID, address _farmer) public view returns(Farmer memory) {
         _PID = _PID.sub(1);
-
-        PoolInfo storage pool = allPools[_PID];
-
-        __computePoolReward(_PID);
-        Farmer storage farmerInfo = poolToFarmers[_PID][_farmer];
-
-        //increase user and pool staking
-        farmerInfo.rewardEarned = farmerInfo.rewardEarned.add(farmerInfo.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
-        farmerInfo.rewardDue = farmerInfo.rewardDue.add(farmerInfo.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
-
-        return farmerInfo;
+        return poolToFarmers[_PID][_farmer];
     }
 
 
