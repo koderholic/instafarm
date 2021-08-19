@@ -23,6 +23,9 @@ Connect your metamask wallet to the site.
 * You can withdraw any or all amount of your stake out of the platform, by clicking on UnStake, enter the amount you want to unstaked, sign the transaction via metamask and UnStake!
 * You can claim your IST reward earned on your stake, by clicking on the Claim Reward button and sign the transaction via metamask
 
+Note :
+The platform currently only supports the platform token staking (IST) and ETH-DIA LP Token on Ropsten
+
 Developer User :
 As a developer, you can extend the InstaFarm functionality, build on top of it or help us make it better by creating identifying bugs and creating issues on this repo
 
