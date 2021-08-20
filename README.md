@@ -41,5 +41,5 @@ Steps :
 
 Deployment :
 The contract is currently deployed on Ethereum Testnet ~ Ropsten
-Pool contract address :  0xF36B836b735a671299F45AA97CCbfb215B313cAC
+Pool contract address :  0x60394e410c0e9641624E36F30ce422cc584737a9
 Platform token contract address : 0x6782e6A63C6d8a292bb09Ee5A1E149ae5a1226D7
