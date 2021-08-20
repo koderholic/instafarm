@@ -126,8 +126,8 @@ contract InstaFarm is Ownable {
 
         //increase user and pool staking
         farmer.amount = farmer.amount.add(_amount);
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
 
         // Emit pool Deposit
         emit PoolDeposit(_PID, msg.sender, _amount, farmer.amount);
@@ -148,7 +148,7 @@ contract InstaFarm is Ownable {
         uint256 poolRewardPerUnitStake = poolRewardForDist.div(totalStakedInPool);
 
         pool.lastRewardBlock = block.number;
-        pool.poolRewardPerUnitStake = pool.poolRewardPerUnitStake.add(poolRewardPerUnitStake.mul(1e12));
+        pool.poolRewardPerUnitStake = pool.poolRewardPerUnitStake.add(poolRewardPerUnitStake);
         pool.totalRewardEarned = pool.totalRewardEarned.add(poolRewardForDist);
     }
 
@@ -171,8 +171,8 @@ contract InstaFarm is Ownable {
 
         // Calculate pool and user reward up until current block; inclusing user pending reward or rewarddue
         __computePoolReward(_PID);
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
 
         // reduce user and pool staking
         farmer.amount = farmer.amount.sub(_amount);
@@ -200,8 +200,8 @@ contract InstaFarm is Ownable {
         __computePoolReward(_PID);
 
         //reduce user and pool staking
-        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
-        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.div(1e12).mul(pool.poolRewardPerUnitStake));
+        farmer.rewardEarned = farmer.rewardEarned.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
+        farmer.rewardDue = farmer.rewardDue.add(farmer.amount.mul(pool.poolRewardPerUnitStake));
 
         platformToken.transferFrom(address(rewardVault), msg.sender, farmer.rewardDue);
         farmer.rewardDue = 0;
@@ -210,6 +210,9 @@ contract InstaFarm is Ownable {
         emit ClaimReward(_PID, msg.sender, farmer.rewardDue);
     }
 
+    function updateTotalDistReward(uint256 _amount) public onlyOwner {
+        totalDistRewardPerBlock = _amount;
+    }
 
     // Get poolID
     function getPoolID(address _poolLP) public view returns(uint256) {
@@ -225,7 +228,23 @@ contract InstaFarm is Ownable {
 
     function getFarmerInfoPerPoolID(uint256 _PID, address _farmer) public view returns(Farmer memory) {
         _PID = _PID.sub(1);
-        return poolToFarmers[_PID][_farmer];
+        Farmer memory farmerInfo = poolToFarmers[_PID][_farmer];
+
+        PoolInfo storage pool = allPools[_PID];
+        if (pool.lastRewardBlock >= block.number) {
+            return farmerInfo;
+        }
+
+        uint256 pendingBlockReward = block.number.sub(pool.lastRewardBlock);
+
+        uint256 poolRewardForDist = totalDistRewardPerBlock.mul(pendingBlockReward).mul(pool.rewardFactor).div(totalRewardFactorPerBlock);
+        uint256 totalStakedInPool = pool.lpToken.balanceOf(address(this));
+        uint256 poolRewardPerUnitStake = poolRewardForDist.div(totalStakedInPool);
+
+        farmerInfo.rewardEarned = farmerInfo.rewardEarned.add(farmerInfo.amount.mul(poolRewardPerUnitStake));
+        farmerInfo.rewardDue = farmerInfo.rewardDue.add(farmerInfo.amount.mul(poolRewardPerUnitStake));
+
+        return farmerInfo;
     }
 
 

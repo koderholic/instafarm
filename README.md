@@ -15,7 +15,9 @@ On InstaFarm you can stake your IST or any supported LP tokens to earn more IST 
 
 Steps :
 * Ensure you have metamask chrome extension istalled, if you don't, you can read this article on how to install metamask on Chrome :
+  https://blog.wetrust.io/how-to-install-and-use-metamask-7210720ca047?gi=aa6469944371
 * Ensure your metamask is on Ropsten network; See how to change network on metamask here :
+  https://help.idex.io/en/articles/4852233-how-to-switch-networks-on-metamask
 Go to the frontend dapp at https://instafarm.netlify.app
 Connect your metamask wallet to the site.
 * If you already have some tokens / LP staked, you would see the total amount you have staked and the amount of IST you have earned as reward per pool
@@ -39,4 +41,5 @@ Steps :
 
 Deployment :
 The contract is currently deployed on Ethereum Testnet ~ Ropsten
-Contract address : 
+Pool contract address :  0xF36B836b735a671299F45AA97CCbfb215B313cAC
+Platform token contract address : 0x6782e6A63C6d8a292bb09Ee5A1E149ae5a1226D7
